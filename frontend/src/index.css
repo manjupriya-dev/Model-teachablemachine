@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Playful Color Palette */
+  --bg: #E0F2FE; /* Light sky blue */
+  --bg-card: #ffffff;
+  --white: #ffffff;
+  --border: #F1F5F9;
+  --border-light: #F8FAFC;
+  --border-bright: #bae6fd;
+  
+  --primary: #3b82f6;
+  --primary-light: #dbeafe;
+  --primary-hover: #2563eb;
+  
+  --accent-pink: #ec4899;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  --accent-purple: #8b5cf6;
+  --accent-yellow: #fcd34d;
+  
+  --text: #334155;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
+  
+  --radius: 20px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-sm: 12px;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Nunito', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+button { 
+  font-family: inherit; 
+  cursor: pointer; 
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+}
+button:active {
+  transform: scale(0.95);
+}
+input { font-family: inherit; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@media (max-width: 900px) {
+  .workspace-layout {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .workspace-col {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+  .connector {
+    transform: rotate(90deg);
+    margin: 10px auto !important;
+  }
+}

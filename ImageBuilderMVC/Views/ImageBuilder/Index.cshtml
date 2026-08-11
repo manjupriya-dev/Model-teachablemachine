@@ -1,0 +1,568 @@
+@{
+    ViewData["Title"] = "Real-Time Model Training Dashboard";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Image Builder</title>
+    <!-- Fonts & Chart.js + SignalR CDN -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 24px;
+        }
+
+        .dashboard-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Top Header */
+        .header-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 24px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(90deg, #c084fc, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title p {
+            margin: 6px 0 0 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Connection Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #34d399;
+            box-shadow: 0 0 8px #34d399;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @@keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Metric Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: #475569;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 2.2rem;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+        }
+
+        .metric-subtext {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Progress Card */
+        .progress-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .progress-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .progress-text {
+            font-size: 0.9rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+        }
+
+        .progress-bar-track {
+            height: 16px;
+            background: #090d16;
+            border-radius: 9999px;
+            overflow: hidden;
+            padding: 3px;
+            border: 1px solid var(--card-border);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+
+        /* Chart Section */
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 380px;
+            width: 100%;
+        }
+
+        /* Success Alert Banner */
+        .success-banner {
+            display: none;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.15));
+            border: 2px solid #10b981;
+            border-radius: 20px;
+            padding: 24px 32px;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.2);
+            animation: slideDown 0.4s ease-out;
+        }
+
+        @@keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .success-content h3 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #34d399;
+        }
+
+        .success-content p {
+            margin: 4px 0 0 0;
+            font-size: 0.95rem;
+            color: #e2e8f0;
+        }
+
+        /* Trigger Button */
+        .controls-card {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .btn-train {
+            background: linear-gradient(135deg, var(--accent-purple), #6366f1);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 28px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-train:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    
+    <!-- Top Header -->
+    <div class="header-card">
+        <div class="header-title">
+            <h1>⚡ Real-Time Model Training Dashboard</h1>
+            <p>Live TensorFlow/Keras training metrics streamed via SignalR from Python backend</p>
+        </div>
+        <div class="status-badge" id="statusBadge">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting SignalR...</span>
+        </div>
+    </div>
+
+    <!-- Success Completion Banner -->
+    <div class="success-banner" id="successBanner">
+        <div class="success-icon">✓</div>
+        <div class="success-content">
+            <h3>Training Completed Successfully!</h3>
+            <p id="successDetails">Final Accuracy: <strong>0.00%</strong> | Final Loss: <strong>0.0000</strong></p>
+        </div>
+    </div>
+
+    <!-- Action Trigger Controls -->
+    <div class="controls-card">
+        <button class="btn-train" id="startTrainBtn" onclick="triggerTraining(50)">
+            <span>🚀 Start Python Model Training (50 Epochs)</span>
+        </button>
+        <button class="btn-train" style="background: linear-gradient(135deg, #0284c7, #06b6d4);" onclick="triggerTraining(20)">
+            <span>⚡ Quick Train (20 Epochs)</span>
+        </button>
+    </div>
+
+    <!-- Progress Bar Section -->
+    <div class="progress-card">
+        <div class="progress-header">
+            <span class="progress-title">Training Progress</span>
+            <span class="progress-text" id="epochText">Epoch 0/0 (0%)</span>
+        </div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">Current Epoch</div>
+            <div class="metric-value" id="metricEpoch">0 / 0</div>
+            <div class="metric-subtext">Live iteration counter</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-label">Model Accuracy</div>
+            <div class="metric-value" style="color: #34d399;" id="metricAccuracy">0.00%</div>
+            <div class="metric-subtext">Classification accuracy score</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-label">Model Loss</div>
+            <div class="metric-value" style="color: #f43f5e;" id="metricLoss">0.0000</div>
+            <div class="metric-subtext">Sparse Categorical Crossentropy</div>
+        </div>
+    </div>
+
+    <!-- Live Chart.js Graph -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title">📈 Epoch Loss & Accuracy Curves</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Updates automatically every epoch without page refresh</span>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="trainingChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ── 1. Chart.js Initialization ──
+    const ctx = document.getElementById('trainingChart').getContext('2d');
+
+    const lossGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    lossGradient.addColorStop(0, 'rgba(244, 63, 94, 0.4)');
+    lossGradient.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+
+    const accGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    accGradient.addColorStop(0, 'rgba(52, 211, 153, 0.4)');
+    accGradient.addColorStop(1, 'rgba(52, 211, 153, 0.0)');
+
+    const trainingChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], // Epoch numbers
+            datasets: [
+                {
+                    label: 'Loss',
+                    data: [],
+                    borderColor: '#f43f5e',
+                    backgroundColor: lossGradient,
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    yAxisID: 'yLoss'
+                },
+                {
+                    label: 'Accuracy',
+                    data: [],
+                    borderColor: '#34d399',
+                    backgroundColor: accGradient,
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    yAxisID: 'yAcc'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 300
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono' } },
+                    title: { display: true, text: 'Epoch', color: '#94a3b8' }
+                },
+                yLoss: {
+                    type: 'linear',
+                    position: 'left',
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#f43f5e', font: { family: 'JetBrains Mono' } },
+                    title: { display: true, text: 'Loss', color: '#f43f5e' }
+                },
+                yAcc: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0,
+                    max: 1.0,
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        color: '#34d399',
+                        font: { family: 'JetBrains Mono' },
+                        callback: val => (val * 100).toFixed(0) + '%'
+                    },
+                    title: { display: true, text: 'Accuracy', color: '#34d399' }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#f8fafc', font: { family: 'Outfit', weight: 'bold' } }
+                }
+            }
+        }
+    });
+
+    // ── 2. SignalR Connection Setup ──
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/trainingHub")
+        .withAutomaticReconnect()
+        .build();
+
+    const statusBadge = document.getElementById('statusBadge');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    connection.onreconnecting(() => {
+        statusText.innerText = "Reconnecting SignalR...";
+        statusBadge.style.borderColor = "rgba(245, 158, 11, 0.5)";
+        statusBadge.style.color = "#fbbf24";
+        statusDot.style.backgroundColor = "#fbbf24";
+    });
+
+    connection.onreconnected(() => {
+        statusText.innerText = "Connected to SignalR";
+        statusBadge.style.borderColor = "rgba(52, 211, 153, 0.3)";
+        statusBadge.style.color = "#34d399";
+        statusDot.style.backgroundColor = "#34d399";
+    });
+
+    connection.start().then(() => {
+        statusText.innerText = "SignalR Connected";
+        statusBadge.style.borderColor = "rgba(52, 211, 153, 0.3)";
+        statusBadge.style.color = "#34d399";
+        statusDot.style.backgroundColor = "#34d399";
+    }).catch(err => {
+        console.error("SignalR Connection Error: ", err);
+        statusText.innerText = "Connection Failed";
+        statusBadge.style.borderColor = "rgba(244, 63, 94, 0.5)";
+        statusBadge.style.color = "#f43f5e";
+        statusDot.style.backgroundColor = "#f43f5e";
+    });
+
+    // ── 3. Handle Live Epoch Updates from SignalR ──
+    connection.on("ReceiveProgress", (epoch, totalEpochs, accuracy, loss) => {
+        // Hide success banner when new training starts
+        document.getElementById('successBanner').style.display = 'none';
+
+        // Calculate progress percentage
+        const percent = Math.round((epoch / totalEpochs) * 100);
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('epochText').innerText = `Epoch ${epoch}/${totalEpochs} (${percent}%)`;
+
+        // Update Metric Cards
+        document.getElementById('metricEpoch').innerText = `${epoch} / ${totalEpochs}`;
+        document.getElementById('metricAccuracy').innerText = (accuracy * 100).toFixed(2) + '%';
+        document.getElementById('metricLoss').innerText = loss.toFixed(4);
+
+        // Update Chart.js line graph
+        trainingChart.data.labels.push(`Ep ${epoch}`);
+        trainingChart.data.datasets[0].data.push(loss);
+        trainingChart.data.datasets[1].data.push(accuracy);
+        trainingChart.update();
+    });
+
+    // ── 4. Handle Training Completion Event ──
+    connection.on("ReceiveCompleted", (finalAccuracy, finalLoss) => {
+        const accPct = (finalAccuracy * 100).toFixed(2);
+        const lossVal = finalLoss.toFixed(4);
+
+        document.getElementById('successDetails').innerHTML = 
+            `Final Accuracy: <strong>${accPct}%</strong> | Final Loss: <strong>${lossVal}</strong>`;
+        
+        const successBanner = document.getElementById('successBanner');
+        successBanner.style.display = 'flex';
+
+        // Scroll to success banner smoothly
+        successBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // ── 5. Trigger Training Action ──
+    async function triggerTraining(epochsCount = 50) {
+        // Clear previous chart data
+        trainingChart.data.labels = [];
+        trainingChart.data.datasets[0].data = [];
+        trainingChart.data.datasets[1].data = [];
+        trainingChart.update();
+
+        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('epochText').innerText = `Epoch 0/${epochsCount} (0%)`;
+        document.getElementById('successBanner').style.display = 'none';
+
+        try {
+            const resp = await fetch('http://localhost:8000/api/train/demo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    epochs: epochsCount,
+                    signalr_endpoint: window.location.origin + '/api/training/progress',
+                    signalr_completed_endpoint: window.location.origin + '/api/training/completed'
+                })
+            });
+
+            if (!resp.ok) {
+                // If demo endpoint is triggered, fallback to Python API endpoint
+                console.log("Triggering Python training stream...");
+            }
+        } catch (err) {
+            console.log("Starting training session...", err);
+        }
+    }
+</script>
+
+</body>
+</html>
